@@ -17,6 +17,7 @@ interface SceneState {
   history: any[];
   llmModel: string;
   template: string;
+  webhookUrl: string;
   isHistoryOpen: boolean;
   setPhase: (phase: typeof Phase[keyof typeof Phase]) => void;
   setQuery: (query: string) => void;
@@ -28,6 +29,7 @@ interface SceneState {
   setHistory: (history: any[]) => void;
   setLlmModel: (model: string) => void;
   setTemplate: (template: string) => void;
+  setWebhookUrl: (url: string) => void;
   setIsHistoryOpen: (open: boolean) => void;
 }
 
@@ -44,6 +46,7 @@ export const useSceneStore = create<SceneState>((set) => ({
   history: [],
   llmModel: 'Llama 3 (Local)',
   template: 'DEEP_DIVE',
+  webhookUrl: '',
   isHistoryOpen: false,
   setPhase: (phase) => set({ phase }),
   setQuery: (query) => set({ query }),
@@ -55,5 +58,6 @@ export const useSceneStore = create<SceneState>((set) => ({
   setHistory: (history) => set({ history }),
   setLlmModel: (llmModel) => set({ llmModel }),
   setTemplate: (template) => set({ template }),
+  setWebhookUrl: (webhookUrl) => set({ webhookUrl }),
   setIsHistoryOpen: (isHistoryOpen) => set({ isHistoryOpen }),
 }));

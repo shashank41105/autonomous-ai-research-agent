@@ -6,6 +6,7 @@ from src.agent.nodes import (
     scrape_node,
     summarize_node,
     synthesis_node,
+    critic_node,
     review_node
 )
 
@@ -21,6 +22,7 @@ def create_research_graph():
     workflow.add_node("scrape", scrape_node)
     workflow.add_node("summarize", summarize_node)
     workflow.add_node("synthesize", synthesis_node)
+    workflow.add_node("critic", critic_node)
     workflow.add_node("review", review_node)
 
     # Define edges
@@ -29,7 +31,8 @@ def create_research_graph():
     workflow.add_edge("search", "scrape")
     workflow.add_edge("scrape", "summarize")
     workflow.add_edge("summarize", "synthesize")
-    workflow.add_edge("synthesize", "review")
+    workflow.add_edge("synthesize", "critic")
+    workflow.add_edge("critic", "review")
 
     # Conditional edge for review
     workflow.add_conditional_edges(
@@ -45,3 +48,4 @@ def create_research_graph():
 
 # Singleton instance for easy import
 research_agent = create_research_graph()
+

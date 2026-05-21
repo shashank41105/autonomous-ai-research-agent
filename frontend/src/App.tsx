@@ -5,6 +5,7 @@ import { OrbitControls, Stars, PerspectiveCamera } from '@react-three/drei';
 import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing';
 import { NebulaField } from './components/canvas/nebula/NebulaField';
 import { CoreCrystal } from './components/canvas/core/CoreCrystal';
+import { OrbitalSources } from './components/canvas/environment/OrbitalSources';
 import { CameraRig } from './components/canvas/environment/CameraRig';
 import { CommandHUD } from './components/hud/CommandHUD';
 
@@ -26,6 +27,7 @@ export default function App() {
           <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
           <NebulaField />
           <CoreCrystal />
+          <OrbitalSources />
           <CameraRig />
         </Suspense>
 
@@ -40,3 +42,4 @@ export default function App() {
     </div>
   );
 }
+

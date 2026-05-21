@@ -12,7 +12,8 @@ export const useResearchFlow = () => {
     logs, setLogs,
     currentStep, setCurrentStep,
     setHistory,
-    template
+    template,
+    webhookUrl
   } = useSceneStore();
 
   const fetchHistory = async () => {
@@ -39,7 +40,7 @@ export const useResearchFlow = () => {
     setCurrentStep("idle");
 
     try {
-      const data = await researchClient.startResearch(activeQuery, template);
+      const data = await researchClient.startResearch(activeQuery, template, webhookUrl);
       setTaskId(data.task_id);
       setPhase(Phase.SEARCHING);
     } catch (e) {

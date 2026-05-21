@@ -19,12 +19,48 @@ export const CommandHUD = () => {
     history,
     llmModel, setLlmModel,
     template, setTemplate,
+    webhookUrl, setWebhookUrl,
     isHistoryOpen, setIsHistoryOpen
   } = useSceneStore();
 
   const { startResearch } = useResearchFlow();
   const [copied, setCopied] = useState(false);
   const consoleEndRef = useRef<HTMLDivElement>(null);
+
+  // Exporter & Theming tabs state
+  const [activeTab, setActiveTab] = useState<'document' | 'slides' | 'themes'>('document');
+  const [slidesContent, setSlidesContent] = useState<string>('');
+  const [loadingSlides, setLoadingSlides] = useState<boolean>(false);
+
+  // Fetch slide markdown from export endpoint
+  useEffect(() => {
+    if (activeTab === 'slides' && taskId && !slidesContent) {
+      const fetchSlides = async () => {
+        setLoadingSlides(true);
+        try {
+          const res = await fetch(`/api/export/${taskId}?format=slides`);
+          if (res.ok) {
+            const text = await res.text();
+            setSlidesContent(text);
+          } else {
+            setSlidesContent("Failed to load slides from backend.");
+          }
+        } catch (err) {
+          console.error("Error fetching slides:", err);
+          setSlidesContent("Error fetching slides from backend.");
+        } finally {
+          setLoadingSlides(false);
+        }
+      };
+      fetchSlides();
+    }
+  }, [activeTab, taskId, slidesContent]);
+
+  // Reset tab states when taskId changes
+  useEffect(() => {
+    setActiveTab('document');
+    setSlidesContent('');
+  }, [taskId]);
 
   // Auto-scroll the live telemetry terminal
   useEffect(() => {
@@ -442,20 +478,170 @@ export const CommandHUD = () => {
                 </div>
               </div>
 
+              {/* Sub-Header Tab Bar */}
+              <div className="flex border-b border-cyan-500/15 bg-slate-950/40 px-6 py-1.5 gap-4">
+                <button
+                  onClick={() => setActiveTab('document')}
+                  className={`px-3 py-2 text-[10px] font-mono font-bold tracking-wider border-b-2 transition-all cursor-pointer ${
+                    activeTab === 'document'
+                      ? 'border-cyan-400 text-cyan-400 font-extrabold shadow-[0_4px_10px_-4px_rgba(6,182,212,0.4)]'
+                      : 'border-transparent text-slate-400 hover:text-cyan-300'
+                  }`}
+                >
+                  📁 EDITORIAL DOSSIER
+                </button>
+                <button
+                  onClick={() => setActiveTab('slides')}
+                  className={`px-3 py-2 text-[10px] font-mono font-bold tracking-wider border-b-2 transition-all cursor-pointer ${
+                    activeTab === 'slides'
+                      ? 'border-cyan-400 text-cyan-400 font-extrabold shadow-[0_4px_10px_-4px_rgba(6,182,212,0.4)]'
+                      : 'border-transparent text-slate-400 hover:text-cyan-300'
+                  }`}
+                >
+                  📊 PRESENTATION SLIDES (MARP)
+                </button>
+                <button
+                  onClick={() => setActiveTab('themes')}
+                  className={`px-3 py-2 text-[10px] font-mono font-bold tracking-wider border-b-2 transition-all cursor-pointer ${
+                    activeTab === 'themes'
+                      ? 'border-cyan-400 text-cyan-400 font-extrabold shadow-[0_4px_10px_-4px_rgba(6,182,212,0.4)]'
+                      : 'border-transparent text-slate-400 hover:text-cyan-300'
+                  }`}
+                >
+                  ✨ VISUAL THEMING ENGINE
+                </button>
+              </div>
+
               {/* Editorial styled report viewer */}
               <div className="flex-1 overflow-y-auto p-6 md:p-10 select-text scrollbar-thin bg-slate-950/30">
-                <div className="max-w-3xl mx-auto font-sans leading-relaxed">
-                  
-                  {/* Visual Drop Cap Cover Section */}
-                  <div className="flex items-center gap-2 mb-6 border border-cyan-500/10 p-4 rounded-xl bg-cyan-950/10">
-                    <Sparkles size={20} className="text-cyan-400 animate-pulse shrink-0" />
-                    <p className="font-mono text-[10px] text-cyan-400/80 leading-relaxed uppercase tracking-wider">
-                      This report has been compiled and aggregated by Astral Archive via cognitive local pipeline. Content holds direct sources linked as bracketed reference pointers.
-                    </p>
-                  </div>
+                
+                {activeTab === 'document' && (
+                  <div className="max-w-3xl mx-auto font-sans leading-relaxed">
+                    {/* Visual Drop Cap Cover Section */}
+                    <div className="flex items-center gap-2 mb-6 border border-cyan-500/10 p-4 rounded-xl bg-cyan-950/10">
+                      <Sparkles size={20} className="text-cyan-400 animate-pulse shrink-0" />
+                      <p className="font-mono text-[10px] text-cyan-400/80 leading-relaxed uppercase tracking-wider">
+                        This report has been compiled and aggregated by Astral Archive via cognitive local pipeline. Content holds direct sources linked as bracketed reference pointers.
+                      </p>
+                    </div>
 
-                  {renderEditorialContent(finalReport)}
-                </div>
+                    {renderEditorialContent(finalReport)}
+                  </div>
+                )}
+
+                {activeTab === 'slides' && (
+                  <div className="max-w-3xl mx-auto flex flex-col h-full gap-4">
+                    <div className="flex justify-between items-center border border-cyan-500/10 p-4 rounded-xl bg-cyan-950/10">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-cyan-400 shrink-0 animate-pulse" />
+                        <p className="font-mono text-[10px] text-cyan-400/80 uppercase tracking-wider">
+                          Marp Markdown presentation slide deck generated from research dossier. Copy to clipboard or compile via Marp CLI.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(slidesContent);
+                          alert("Marp Markdown presentation slide deck copied to clipboard!");
+                        }}
+                        disabled={loadingSlides || !slidesContent}
+                        className="flex items-center gap-2 bg-cyan-950/50 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-500/30 hover:border-cyan-500 text-cyan-400 px-3 py-1.5 rounded font-mono text-[10px] font-bold cursor-pointer transition-all shadow-sm disabled:opacity-50"
+                      >
+                        <Copy size={12} />
+                        <span>COPY MARP SLIDES</span>
+                      </button>
+                    </div>
+
+                    {loadingSlides ? (
+                      <div className="flex-1 flex flex-col justify-center items-center py-20 gap-3 text-cyan-500/60 font-mono text-xs">
+                        <Loader2 className="animate-spin text-cyan-500" size={24} />
+                        <span>COMPILING BOARD-READY SLIDES...</span>
+                      </div>
+                    ) : (
+                      <pre className="flex-1 bg-slate-950 border border-cyan-500/20 p-5 rounded-xl font-mono text-xs text-cyan-300/90 leading-relaxed overflow-x-auto whitespace-pre-wrap select-all max-h-[50vh]">
+                        {slidesContent}
+                      </pre>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'themes' && (
+                  <div className="max-w-3xl mx-auto flex flex-col gap-6">
+                    <div className="flex items-center gap-2 border border-cyan-500/10 p-4 rounded-xl bg-cyan-950/10 mb-2">
+                      <Sparkles size={16} className="text-cyan-400 shrink-0" />
+                      <p className="font-mono text-[10px] text-cyan-400/80 leading-relaxed uppercase tracking-wider">
+                        Visualize this dossier using the astral visual rendering node. Renders customized HTML themes suited for different publishing audiences.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      
+                      {/* Corporate Dark Theme Card */}
+                      <div className="bg-slate-900/60 border border-cyan-500/15 rounded-xl p-5 flex flex-col justify-between gap-4 transition-all hover:border-cyan-500/40 group shadow-md">
+                        <div>
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-mono text-[9px] text-cyan-400 bg-cyan-950/50 px-2 py-0.5 border border-cyan-500/30 rounded uppercase tracking-widest font-bold">THEME_01</span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500/60" />
+                          </div>
+                          <h3 className="text-base font-bold text-white font-serif tracking-wide group-hover:text-cyan-300 transition-colors">Corporate Dark</h3>
+                          <p className="font-sans text-xs text-slate-400 leading-relaxed mt-2">
+                            Professional slate-blue gradient panels, thin structural separators, high-tech cybernetic callouts. Designed for modern corporate pitches.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => window.open(`/api/export/${taskId}?format=html&theme=corporate`, '_blank')}
+                          className="flex items-center justify-center gap-2 bg-cyan-950/40 hover:bg-cyan-500 text-cyan-400 hover:text-slate-950 p-2.5 border border-cyan-500/30 hover:border-cyan-500 transition-all rounded-lg font-mono text-xs font-bold cursor-pointer"
+                        >
+                          <span>Render Live</span>
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
+
+                      {/* Academic Ledger Theme Card */}
+                      <div className="bg-slate-900/60 border border-cyan-500/15 rounded-xl p-5 flex flex-col justify-between gap-4 transition-all hover:border-cyan-500/40 group shadow-md">
+                        <div>
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-mono text-[9px] text-cyan-400 bg-cyan-950/50 px-2 py-0.5 border border-cyan-500/30 rounded uppercase tracking-widest font-bold">THEME_02</span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+                          </div>
+                          <h3 className="text-base font-bold text-white font-serif tracking-wide group-hover:text-cyan-300 transition-colors">Academic Ledger</h3>
+                          <p className="font-sans text-xs text-slate-400 leading-relaxed mt-2">
+                            Timeless traditional academic style. Serif typography, double top-and-bottom ledger boarders, multi-column print-ready simulation layout.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => window.open(`/api/export/${taskId}?format=html&theme=academic`, '_blank')}
+                          className="flex items-center justify-center gap-2 bg-cyan-950/40 hover:bg-cyan-500 text-cyan-400 hover:text-slate-950 p-2.5 border border-cyan-500/30 hover:border-cyan-500 transition-all rounded-lg font-mono text-xs font-bold cursor-pointer"
+                        >
+                          <span>Render Live</span>
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
+
+                      {/* Minimalist Tech Theme Card */}
+                      <div className="bg-slate-900/60 border border-cyan-500/15 rounded-xl p-5 flex flex-col justify-between gap-4 transition-all hover:border-cyan-500/40 group shadow-md">
+                        <div>
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-mono text-[9px] text-cyan-400 bg-cyan-950/50 px-2 py-0.5 border border-cyan-500/30 rounded uppercase tracking-widest font-bold">THEME_03</span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                          </div>
+                          <h3 className="text-base font-bold text-white font-serif tracking-wide group-hover:text-cyan-300 transition-colors">Minimalist Tech</h3>
+                          <p className="font-sans text-xs text-slate-400 leading-relaxed mt-2">
+                            High-contrast visual layout with solid neon-green borders, clean geometric blocks, and ultra-precise spacing. Optimized for technical specs.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => window.open(`/api/export/${taskId}?format=html&theme=tech`, '_blank')}
+                          className="flex items-center justify-center gap-2 bg-cyan-950/40 hover:bg-cyan-500 text-cyan-400 hover:text-slate-950 p-2.5 border border-cyan-500/30 hover:border-cyan-500 transition-all rounded-lg font-mono text-xs font-bold cursor-pointer"
+                        >
+                          <span>Render Live</span>
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
               </div>
 
               {/* Modal Footer Controls */}
@@ -530,6 +716,19 @@ export const CommandHUD = () => {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Webhook Configuration */}
+            <div className="flex items-center gap-2 min-w-[280px] sm:w-auto">
+              <span className="text-cyan-500/60 font-bold uppercase tracking-wider text-[10px]">Webhook:</span>
+              <input
+                type="text"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                disabled={phase !== Phase.IDLE}
+                placeholder="Slack/Discord Webhook URL (Optional)"
+                className="bg-slate-900 border border-cyan-500/20 text-cyan-400 rounded p-1.5 px-3 focus:outline-none focus:border-cyan-400 font-mono text-[10px] w-48 transition-all focus:w-64 placeholder-cyan-950/40 disabled:opacity-50"
+              />
             </div>
 
           </div>

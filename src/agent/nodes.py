@@ -60,7 +60,7 @@ def update_task_telemetry(state: ResearchState, current_step: str, log_messages:
 
 async def query_planner(state: ResearchState) -> Dict:
     """
-    Breaks down the main query into multiple search queries.
+    Breaks down the main query into multiple search queries, leveraging historical context if semantically similar.
     """
     query = state['query']
     
@@ -70,12 +70,80 @@ async def query_planner(state: ResearchState) -> Dict:
     ]
     formatted = update_task_telemetry(state, "planner", logs)
 
-    # Use Ollama to generate multiple search queries
-    prompt = (
-        f"You are a research assistant. The user wants to research: '{query}'.\n"
-        f"Generate 3 diverse and specific search queries to find the most comprehensive "
-        f"and accurate information on this topic. Return only the queries, one per line."
-    )
+    # Local Semantic Memory recall
+    past_report_context = ""
+    memory_logs = []
+    try:
+        with sqlite3.connect("tasks.db") as conn:
+            cursor = conn.execute("SELECT task_id, result FROM tasks WHERE status = 'completed' AND task_id != ?", (state.get("task_id", ""),))
+            past_tasks = cursor.fetchall()
+            
+        completed_records = []
+        for tid, res_json in past_tasks:
+            if res_json:
+                res = json.loads(res_json)
+                if "query" in res and "final_report" in res:
+                    completed_records.append({
+                        "task_id": tid,
+                        "query": res["query"],
+                        "final_report": res["final_report"]
+                    })
+        
+        # If we have past tasks, let's run semantic matching using Ollama
+        if completed_records:
+            match_prompt = (
+                f"You are a local semantic memory matcher. Decide if the user's new query: '{query}' "
+                f"semantically matches or overlaps significantly with any of these past queries:\n\n"
+            )
+            for idx, rec in enumerate(completed_records[:10]):
+                match_prompt += f"[{idx}] {rec['query']}\n"
+            
+            match_prompt += (
+                f"\nIf there is a closely related or overlapping query, respond with the exact format 'MATCH: [index]' (e.g., 'MATCH: 0'). "
+                f"If none of them are semantically matching, respond with 'MATCH: NONE'. "
+                f"Do not output any other text."
+            )
+            
+            match_resp = await AsyncClient().chat(model='llama3', messages=[{'role': 'user', 'content': match_prompt}])
+            match_text = match_resp['message']['content'].strip()
+            
+            if "MATCH:" in match_text and "NONE" not in match_text:
+                try:
+                    import re
+                    match_idx_str = re.findall(r'\d+', match_text)
+                    if match_idx_str:
+                        match_idx = int(match_idx_str[0])
+                        if 0 <= match_idx < len(completed_records):
+                            matched_rec = completed_records[match_idx]
+                            past_report_context = matched_rec["final_report"]
+                            memory_logs.append(f"[LOCAL SEMANTIC MEMORY] HIGH-DENSITY MATCH DETECTED IN ASTRAL CORE ARCHIVE!")
+                            memory_logs.append(f"[LOCAL SEMANTIC MEMORY] MATCHED PAST STUDY: '{matched_rec['query']}'")
+                            memory_logs.append("[LOCAL SEMANTIC MEMORY] RECALLING HISTORICAL DOSSIER TO ENABLE INCREMENTAL LEARNING.")
+                except Exception as ex:
+                    print(f"Memory match parsing error: {ex}")
+    except Exception as e:
+        print(f"Error accessing memory index: {e}")
+
+    if memory_logs:
+        formatted_mem = update_task_telemetry(state, "planner", memory_logs)
+        if formatted:
+            formatted.extend(formatted_mem or [])
+
+    # Use Ollama to generate multiple search queries, considering previous context if available
+    if past_report_context:
+        prompt = (
+            f"You are a research assistant. The user wants to research: '{query}'.\n"
+            f"We have previously researched a closely related topic and compiled this report:\n\n"
+            f"--- PREVIOUS RESEARCH START ---\n{past_report_context[:1500]}...\n--- PREVIOUS RESEARCH END ---\n\n"
+            f"Generate 3 diverse and specific search queries to find NEW, UPDATED, or missing details that "
+            f"build on top of the previous research. Return only the queries, one per line."
+        )
+    else:
+        prompt = (
+            f"You are a research assistant. The user wants to research: '{query}'.\n"
+            f"Generate 3 diverse and specific search queries to find the most comprehensive "
+            f"and accurate information on this topic. Return only the queries, one per line."
+        )
 
     response = await AsyncClient().chat(model='llama3', messages=[{'role': 'user', 'content': prompt}])
     content = response['message']['content']
@@ -270,6 +338,65 @@ async def synthesis_node(state: ResearchState) -> Dict:
         "current_step": "synthesize"
     }
 
+async def critic_node(state: ResearchState) -> Dict:
+    """
+    Simulates a multi-agent debate by having a Skeptic Critic review the synthesized report,
+    and the Optimist Researcher revise it, posting the full debate transcript to the logs.
+    """
+    logs = [
+        "INITIATING MULTI-AGENT CRITICAL DEBATE NODES...",
+        "SPAWNING AGENT ROLE: SKEPTIC CRITIC...",
+        "SPAWNING AGENT ROLE: OPTIMIST RESEARCHER..."
+    ]
+    formatted = update_task_telemetry(state, "critic", logs)
+
+    query = state['query']
+    report = state['final_report']
+
+    # Step 1: Critic Reviews
+    critic_prompt = (
+        f"You are a Skeptic Critic evaluating a newly synthesized research report on: '{query}'.\n"
+        f"Analyze the report specifically looking for contradictions, unverified claims, bias, or gaps. "
+        f"List exactly 2 specific critical issues or suggestions for improvement. Keep it highly concise.\n\n"
+        f"DRAFT REPORT:\n{report}\n\n"
+        f"Critique:"
+    )
+
+    response = await AsyncClient().chat(model='llama3', messages=[{'role': 'user', 'content': critic_prompt}])
+    critique = response['message']['content']
+
+    debate_log_1 = [
+        "[AGENT DEBATE] SKEPTIC CRITIC: Draft report analyzed. Submitting structural feedback.",
+        f"[AGENT DEBATE] SKEPTIC CRITIC NOTE:\n{critique}"
+    ]
+    formatted_1 = update_task_telemetry(state, "critic", debate_log_1)
+
+    # Step 2: Researcher Refines
+    researcher_prompt = (
+        f"You are the Optimist Researcher. You have received feedback from the Skeptic Critic regarding your research report on '{query}'.\n\n"
+        f"CRITIQUE:\n{critique}\n\n"
+        f"Please revise the original report to directly address these points. Retain the exact markdown formatting, citations, and References section.\n\n"
+        f"ORIGINAL REPORT:\n{report}\n\n"
+        f"Revised Report:"
+    )
+
+    response = await AsyncClient().chat(model='llama3', messages=[{'role': 'user', 'content': researcher_prompt}])
+    refined_report = response['message']['content']
+
+    debate_log_2 = [
+        "[AGENT DEBATE] OPTIMIST RESEARCHER: Critic feedback acknowledged.",
+        "[AGENT DEBATE] OPTIMIST RESEARCHER: Integrating updates, resolving contradictions, and finalizing dossier...",
+        "MUTUAL CONSENSUS ACHIEVED. DEBATE CYCLE RESOLVED."
+    ]
+    formatted_2 = update_task_telemetry(state, "critic", debate_log_2, {"final_report": refined_report})
+
+    all_formatted = (formatted or []) + (formatted_1 or []) + (formatted_2 or [])
+    return {
+        "final_report": refined_report,
+        "logs": all_formatted,
+        "current_step": "critic"
+    }
+
 def review_node(state: ResearchState) -> Dict:
     """
     Determines if the current information is sufficient.
@@ -282,3 +409,4 @@ def review_node(state: ResearchState) -> Dict:
         "logs": formatted or [],
         "current_step": "review"
     }
+

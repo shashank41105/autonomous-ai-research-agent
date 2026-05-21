@@ -3,8 +3,8 @@ import axios from 'axios';
 const API_BASE = '/api';
 
 export const researchClient = {
-  async startResearch(query: string, template: string = 'DEEP_DIVE') {
-    const { data } = await axios.post(`${API_BASE}/research`, { query, template });
+  async startResearch(query: string, template: string = 'DEEP_DIVE', webhookUrl?: string) {
+    const { data } = await axios.post(`${API_BASE}/research`, { query, template, webhook_url: webhookUrl || null });
     return data; // { task_id, status }
   },
 
