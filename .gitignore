@@ -1,0 +1,38 @@
+# Python virtual environment
+venv/
+.venv/
+ENV/
+env/
+
+# Python cache / compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Log files and local DBs
+*.log
+backend.log
+frontend/frontend.log
+frontend/backend.log
+tasks.db
+tasks.db-journal
+
+# IDE and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
+.gemini/
+.gsd/

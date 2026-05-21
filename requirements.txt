@@ -1,0 +1,10 @@
+duckduckgo-search
+beautifulsoup4
+requests
+ollama
+pydantic
+pytest
+fastapi
+uvicorn
+langgraph
+langchain-core
